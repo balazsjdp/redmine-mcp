@@ -8,20 +8,20 @@ npm install
 npm run build
 ```
 
-## 2. Konfiguráció
+## 2. Configuration
 
-Másold a `.env.example`-t `.env`-be, és töltsd ki:
+Copy `.env.example` to `.env` and fill in the details:
 
 ```env
 REDMINE_URL=https://your-redmine.example.com
 REDMINE_API_KEY=your_api_key_here
 ```
 
-Az API key-t a Redmine-ban a **My account → API access key** menüpontban találod.
+You can find the API key in Redmine under **My account → API access key**.
 
-## 3. Claude Desktop konfiguráció
+## 3. Claude Desktop Configuration
 
-A `claude_desktop_config.json`-ba (Windows: `%APPDATA%\Claude\claude_desktop_config.json`,
+In your `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\claude_desktop_config.json`,
 Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
@@ -29,7 +29,7 @@ Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`):
   "mcpServers": {
     "redmine": {
       "command": "node",
-      "args": ["/abszolut/eleresi/ut/redmine-mcp/dist/index.js"],
+      "args": ["/absolute/path/to/redmine-mcp/dist/index.js"],
       "env": {
         "REDMINE_URL": "https://your-redmine.example.com",
         "REDMINE_API_KEY": "your_api_key_here"
@@ -39,7 +39,7 @@ Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`):
 }
 ```
 
-## 4. Docker (opcionális, később)
+## 4. Docker (optional, later)
 
 ```dockerfile
 FROM node:22-alpine
@@ -50,18 +50,18 @@ COPY dist/ ./dist/
 CMD ["node", "dist/index.js"]
 ```
 
-## Elérhető tools
+## Available Tools
 
-| Tool | Leírás |
-|------|--------|
-| `list_issues` | Issue-k listázása szűrőkkel (projekt, státusz, assignee, verzió, stb.) |
-| `get_issue` | Egy issue lekérése journal/komment históriával |
-| `create_issue` | Új issue létrehozása |
-| `update_issue` | Státusz, verzió, assignee, custom field módosítása + komment egyszerre |
-| `add_comment` | Komment hozzáadása issue-hoz |
-| `list_projects` | Projektek listázása |
-| `list_issue_statuses` | Elérhető státuszok |
-| `list_priorities` | Elérhető prioritások |
-| `list_trackers` | Elérhető trackerek (Bug, Feature, stb.) |
-| `list_versions` | Projekt verzióinak listázása |
-| `list_members` | Projekt tagjainak listázása |
+| Tool | Description |
+|------|-------------|
+| `list_issues` | List issues with filters (project, status, assignee, version, etc.) |
+| `get_issue` | Retrieve an issue with journal/comment history |
+| `create_issue` | Create a new issue |
+| `update_issue` | Modify status, version, assignee, custom fields + add a comment at the same time |
+| `add_comment` | Add a comment to an issue |
+| `list_projects` | List projects |
+| `list_issue_statuses` | List available statuses |
+| `list_priorities` | List available priorities |
+| `list_trackers` | List available trackers (Bug, Feature, etc.) |
+| `list_versions` | List project versions |
+| `list_members` | List project members |
