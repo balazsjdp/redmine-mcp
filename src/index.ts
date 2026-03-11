@@ -13,6 +13,7 @@ import {
 
 const REDMINE_URL = (process.env.REDMINE_URL ?? "").replace(/\/$/, "");
 const REDMINE_API_KEY = process.env.REDMINE_API_KEY ?? "";
+const REDMINE_REQUEST_TIMEOUT_MS = Number(process.env.REDMINE_REQUEST_TIMEOUT_MS ?? "15000");
 
 if (!REDMINE_URL || !REDMINE_API_KEY) {
   console.error(
@@ -31,15 +32,31 @@ async function redmineRequest<T = unknown>(
   body?: object
 ): Promise<T> {
   const url = `${REDMINE_URL}${path}`;
-  const response = await fetch(url, {
-    method,
-    headers: {
-      "X-Redmine-API-Key": REDMINE_API_KEY,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REDMINE_REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers: {
+        "X-Redmine-API-Key": REDMINE_API_KEY,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        `Redmine API request timed out after ${REDMINE_REQUEST_TIMEOUT_MS}ms: ${path}`
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const text = await response.text();
@@ -302,8 +319,36 @@ const tools: Tool[] = [
   },
   {
     name: "list_time_activities",
-    description: "List available activities for time logging (e.g., Development, Design).",
+    description:
+      "List available activity types for future time logging. Do not use this to inspect existing logged time entries.",
     inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "list_my_time_entries",
+    description:
+      "Use this when asked what I logged on a given day. Lists my existing Redmine time entries for one specific date, optionally filtered by project.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        spent_on: {
+          type: "string",
+          description: "Date to list time entries for (YYYY-MM-DD).",
+        },
+        project_id: {
+          type: "string",
+          description: "Optional project ID or identifier to restrict results.",
+        },
+        limit: {
+          type: "number",
+          description: "Number of entries to return (default 100).",
+        },
+        offset: {
+          type: "number",
+          description: "Pagination offset.",
+        },
+      },
+      required: ["spent_on"],
+    },
   },
 ];
 
@@ -312,6 +357,14 @@ const tools: Tool[] = [
 // ---------------------------------------------------------------------------
 
 type Args = Record<string, unknown>;
+
+async function getCurrentUserId(): Promise<number> {
+  const data = await redmineRequest<{ user: { id: number } }>("/users/current.json");
+  if (!data.user || typeof data.user.id !== "number") {
+    throw new Error("Redmine API returned an unexpected payload for the current user.");
+  }
+  return data.user.id;
+}
 
 async function handleLogTime(args: Args): Promise<string> {
   const time_entry: Record<string, unknown> = {
@@ -340,7 +393,47 @@ async function handleListTimeActivities(): Promise<string> {
   const data = await redmineRequest<{
     time_entry_activities: Record<string, unknown>[];
   }>("/enumerations/time_entry_activities.json");
+  if (!Array.isArray(data.time_entry_activities)) {
+    throw new Error("Redmine API returned an unexpected payload for time entry activities.");
+  }
   return JSON.stringify(data.time_entry_activities, null, 2);
+}
+
+async function handleListMyTimeEntries(args: Args): Promise<string> {
+  if (typeof args.spent_on !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(args.spent_on)) {
+    throw new Error("spent_on must be provided in YYYY-MM-DD format.");
+  }
+
+  const params = new URLSearchParams();
+  params.set("spent_on", args.spent_on);
+  params.set("user_id", String(await getCurrentUserId()));
+  params.set("limit", String(args.limit ?? 100));
+
+  if (args.project_id !== undefined) params.set("project_id", String(args.project_id));
+  if (args.offset !== undefined) params.set("offset", String(args.offset));
+
+  const data = await redmineRequest<{
+    time_entries: Record<string, unknown>[];
+    total_count: number;
+    offset?: number;
+    limit?: number;
+  }>(`/time_entries.json?${params}`);
+
+  if (!Array.isArray(data.time_entries)) {
+    throw new Error("Redmine API returned an unexpected payload for time entries.");
+  }
+
+  return JSON.stringify(
+    {
+      spent_on: args.spent_on,
+      total_count: data.total_count,
+      offset: data.offset,
+      limit: data.limit,
+      time_entries: data.time_entries,
+    },
+    null,
+    2
+  );
 }
 
 async function handleListIssues(args: Args): Promise<string> {
@@ -525,6 +618,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case "list_time_activities":
         result = await handleListTimeActivities();
+        break;
+      case "list_my_time_entries":
+        result = await handleListMyTimeEntries(args as Args);
         break;
       default:
         throw new Error(`Unknown tool: ${name}`);

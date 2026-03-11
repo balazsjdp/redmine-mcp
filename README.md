@@ -15,6 +15,7 @@ Copy `.env.example` to `.env` and fill in the details:
 ```env
 REDMINE_URL=https://your-redmine.example.com
 REDMINE_API_KEY=your_api_key_here
+REDMINE_REQUEST_TIMEOUT_MS=15000
 ```
 
 You can find the API key in Redmine under **My account → API access key**.
@@ -88,3 +89,4 @@ env = { REDMINE_URL = "https://your-redmine.example.com", REDMINE_API_KEY = "you
 | `list_members`         | List project members                                                             |
 | `log_time`             | Log time (spent hours) on an issue or project                                    |
 | `list_time_activities` | List available activities for time logging                                       |
+| `list_my_time_entries` | List your own time entries for a specific day                                    |
