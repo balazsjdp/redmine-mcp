@@ -65,3 +65,5 @@ CMD ["node", "dist/index.js"]
 | `list_trackers` | List available trackers (Bug, Feature, etc.) |
 | `list_versions` | List project versions |
 | `list_members` | List project members |
+| `log_time` | Log time (spent hours) on an issue or project |
+| `list_time_activities` | List available activities for time logging |

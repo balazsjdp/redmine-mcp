@@ -277,6 +277,34 @@ const tools: Tool[] = [
       required: ["project_id"],
     },
   },
+  // ---- Time Tracking ----
+  {
+    name: "log_time",
+    description: "Log time (spent hours) on an issue or project.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        issue_id: { type: "number", description: "Issue ID (optional if project_id is provided)." },
+        project_id: {
+          type: "string",
+          description: "Project ID or identifier (optional if issue_id is provided).",
+        },
+        spent_on: {
+          type: "string",
+          description: "Date the time was spent (YYYY-MM-DD). Defaults to today.",
+        },
+        hours: { type: "number", description: "Number of hours spent (e.g., 1.5)." },
+        activity_id: { type: "number", description: "Activity ID (e.g., Development, Design)." },
+        comments: { type: "string", description: "Optional description for the time entry." },
+      },
+      required: ["hours"],
+    },
+  },
+  {
+    name: "list_time_activities",
+    description: "List available activities for time logging (e.g., Development, Design).",
+    inputSchema: { type: "object", properties: {} },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -284,6 +312,36 @@ const tools: Tool[] = [
 // ---------------------------------------------------------------------------
 
 type Args = Record<string, unknown>;
+
+async function handleLogTime(args: Args): Promise<string> {
+  const time_entry: Record<string, unknown> = {
+    hours: args.hours,
+  };
+
+  if (args.issue_id !== undefined) time_entry.issue_id = args.issue_id;
+  if (args.project_id !== undefined) time_entry.project_id = args.project_id;
+  if (args.spent_on !== undefined) time_entry.spent_on = args.spent_on;
+  if (args.activity_id !== undefined) time_entry.activity_id = args.activity_id;
+  if (args.comments !== undefined) time_entry.comments = args.comments;
+
+  if (!time_entry.issue_id && !time_entry.project_id) {
+    throw new Error("Either issue_id or project_id must be provided.");
+  }
+
+  const data = await redmineRequest<{ time_entry: Record<string, unknown> }>(
+    "/time_entries.json",
+    "POST",
+    { time_entry }
+  );
+  return JSON.stringify(data.time_entry, null, 2);
+}
+
+async function handleListTimeActivities(): Promise<string> {
+  const data = await redmineRequest<{
+    time_entry_activities: Record<string, unknown>[];
+  }>("/enumerations/time_entry_activities.json");
+  return JSON.stringify(data.time_entry_activities, null, 2);
+}
 
 async function handleListIssues(args: Args): Promise<string> {
   const params = new URLSearchParams();
@@ -461,6 +519,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case "list_members":
         result = await handleListMembers(args as Args);
+        break;
+      case "log_time":
+        result = await handleLogTime(args as Args);
+        break;
+      case "list_time_activities":
+        result = await handleListTimeActivities();
         break;
       default:
         throw new Error(`Unknown tool: ${name}`);
