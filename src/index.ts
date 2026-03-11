@@ -159,6 +159,11 @@ const tools: Tool[] = [
           description: "Target version (fix version) ID.",
         },
         parent_issue_id: { type: "number", description: "Parent issue ID." },
+        swi_category: {
+          type: "string",
+          description:
+            "SWI category value. Automatically maps to custom field ID 24 (e.g. 'Technikai').",
+        },
         custom_fields: {
           type: "array",
           description: "Array of custom field objects: [{ id: number, value: string }].",
@@ -358,6 +363,8 @@ const tools: Tool[] = [
 
 type Args = Record<string, unknown>;
 
+const SWI_CATEGORY_FIELD_ID = 24;
+
 async function getCurrentUserId(): Promise<number> {
   const data = await redmineRequest<{ user: { id: number } }>("/users/current.json");
   if (!data.user || typeof data.user.id !== "number") {
@@ -464,7 +471,7 @@ async function handleGetIssue(args: Args): Promise<string> {
   return JSON.stringify(data.issue, null, 2);
 }
 
-async function handleCreateIssue(args: Args): Promise<string> {
+function buildIssuePayload(args: Args, customFields?: Record<string, unknown>[]): Record<string, unknown> {
   const issue: Record<string, unknown> = {
     project_id: args.project_id,
     subject: args.subject,
@@ -476,12 +483,38 @@ async function handleCreateIssue(args: Args): Promise<string> {
   if (args.assigned_to_id !== undefined) issue.assigned_to_id = args.assigned_to_id;
   if (args.fixed_version_id !== undefined) issue.fixed_version_id = args.fixed_version_id;
   if (args.parent_issue_id !== undefined) issue.parent_issue_id = args.parent_issue_id;
-  if (args.custom_fields !== undefined) issue.custom_fields = args.custom_fields;
+  if (customFields !== undefined && customFields.length > 0) issue.custom_fields = customFields;
+  return issue;
+}
 
-  const data = await redmineRequest<{ issue: Record<string, unknown> }>("/issues.json", "POST", {
-    issue,
-  });
-  return JSON.stringify(data.issue, null, 2);
+async function handleCreateIssue(args: Args): Promise<string> {
+  const baseCustomFields = Array.isArray(args.custom_fields)
+    ? (args.custom_fields as Record<string, unknown>[])
+    : [];
+
+  try {
+    const data = await redmineRequest<{ issue: Record<string, unknown> }>(
+      "/issues.json",
+      "POST",
+      { issue: buildIssuePayload(args, baseCustomFields.length > 0 ? baseCustomFields : undefined) }
+    );
+    return JSON.stringify(data.issue, null, 2);
+  } catch (err) {
+    if (args.swi_category === undefined) throw err;
+
+    // Retry with hardcoded SWI* Kategória field ID
+    const swiField = { id: SWI_CATEGORY_FIELD_ID, value: String(args.swi_category) };
+    const retryFields = [
+      ...baseCustomFields.filter((f) => f.id !== SWI_CATEGORY_FIELD_ID),
+      swiField,
+    ];
+    const data = await redmineRequest<{ issue: Record<string, unknown> }>(
+      "/issues.json",
+      "POST",
+      { issue: buildIssuePayload(args, retryFields) }
+    );
+    return JSON.stringify(data.issue, null, 2);
+  }
 }
 
 async function handleUpdateIssue(args: Args): Promise<string> {
@@ -613,6 +646,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "list_members":
         result = await handleListMembers(args as Args);
         break;
+
       case "log_time":
         result = await handleLogTime(args as Args);
         break;

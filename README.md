@@ -90,3 +90,28 @@ env = { REDMINE_URL = "https://your-redmine.example.com", REDMINE_API_KEY = "you
 | `log_time`             | Log time (spent hours) on an issue or project                                    |
 | `list_time_activities` | List available activities for time logging                                       |
 | `list_my_time_entries` | List your own time entries for a specific day                                    |
+
+## `create_issue` note
+
+`create_issue` supports a dedicated `swi_category` parameter.
+Before issue creation, the MCP reads the Redmine custom field definition for `SWI* Kategória`, resolves its actual custom field ID, then looks up the requested option from that field's `possible_values` list.
+
+Example:
+
+```json
+{
+  "project_id": "my-project",
+  "subject": "Example issue",
+  "swi_category": "Technikai"
+}
+```
+
+This is equivalent to passing a `custom_fields` entry with:
+
+```json
+{
+  "custom_fields": [{ "id": "<resolved field id>", "value": "<resolved option id or value>" }]
+}
+```
+
+If the custom field uses key/value-style options, the MCP sends the resolved Redmine value instead of the human-readable label.
