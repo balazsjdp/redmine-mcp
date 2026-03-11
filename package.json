@@ -1,0 +1,22 @@
+{
+  "name": "redmine-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Redmine",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "redmine-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node --env-file=.env dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
